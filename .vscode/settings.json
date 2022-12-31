@@ -1,0 +1,14 @@
+{
+  "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools",
+  "makefile.launchConfigurations": [
+    {
+      "cwd": "/home/ggorg/Programming/CodeProjects/TinyText",
+      "binaryPath": "/home/ggorg/Programming/CodeProjects/TinyText/ttext",
+      "binaryArgs": []
+    }
+  ],
+  "files.associations": {
+    "*.json": "jsonc",
+    "stdio.h": "c"
+  }
+}
