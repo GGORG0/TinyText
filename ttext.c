@@ -326,7 +326,6 @@ void eDrawRows(struct abuf *ab)
       if (length < 0)
       {
         length = 0;
-        abAppend(ab, "<", 1);
       }
       else
       {
