@@ -7,12 +7,15 @@ ttext_release: ttext ttext.c
 ttext_release_static: ttext_release ttext.c
 	$(CC) ttext.c -o ttext_release_static -Wall -Wextra -pedantic -std=c99 -Os -s -static
 
-all: ttext
-
 release: ttext_release ttext_release_static
 
+debug: ttext
+
+all: debug release
+.DEFAULT_GOAL := all
+
 clean:
-	rm -f ttext
+	rm -f ttext ttext_release ttext_release_static
 
 run: ttext
 	./ttext
