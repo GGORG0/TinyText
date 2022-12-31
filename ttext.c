@@ -19,6 +19,7 @@
 #define CTRL_KEY(k) ((k)&0x1f)
 #define TTEXT_VERSION "0.1"
 #define TAB_SIZE 2
+#define STATUS_BAR_ENABLED 1
 
 enum editorKeymap
 {
@@ -336,7 +337,8 @@ void eDrawRows(struct abuf *ab)
     }
 
     abAppend(ab, "\x1b[K", 3); // clear to the end of the line
-    abAppend(ab, "\r\n", 2);
+    if (STATUS_BAR_ENABLED || y < E.screen_rows - 1)
+      abAppend(ab, "\r\n", 2);
   }
 }
 
@@ -507,7 +509,8 @@ void eRefreshScreen()
   eResetCursor(&ab);
 
   eDrawRows(&ab);
-  eDrawStatusbar(&ab);
+  if (STATUS_BAR_ENABLED)
+    eDrawStatusbar(&ab);
 
   eSetCursorPos(&ab, E.cursor_render_x - E.col_offset + 1, E.cursor_y - E.row_offset + 1);
   eSetCursorVisibility(&ab, 1);
@@ -605,7 +608,8 @@ void eInitEditor()
   if (tGetTerminalSize(&E.screen_rows, &E.screen_cols) == -1)
     tOnError("tGetTerminalSize");
 
-  E.screen_rows -= 1;
+  if (STATUS_BAR_ENABLED)
+    E.screen_rows -= 1;
 }
 
 /* FILE IO */
