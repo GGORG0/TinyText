@@ -1,6 +1,6 @@
 # TinyText
 
-TinyText (TText for short) is a really small text ~~editor~~ (only viewer for now) written entirely in C.
+TinyText (TText for short) is a really small text ~~editor~~ (only viewer for now) written entirely in C with the goal of not requiring any external dependencies.
 
 ## Keymap
 
