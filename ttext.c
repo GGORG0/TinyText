@@ -56,6 +56,8 @@ struct editorConfig
   int row_offset;
   int col_offset;
 
+  char *current_filename;
+
   struct termios orig_termios;
 };
 struct editorConfig E;
@@ -321,10 +323,7 @@ void eDrawRows(struct abuf *ab)
     }
 
     abAppend(ab, "\x1b[K", 3); // clear to the end of the line
-    if (y < E.screen_rows - 1)
-    {
-      abAppend(ab, "\r\n", 2);
-    }
+    abAppend(ab, "\r\n", 2);
   }
 }
 
@@ -441,6 +440,42 @@ void eUpdateScrollOffsets()
   }
 }
 
+void eDrawStatusbar(struct abuf *ab)
+{
+  abAppend(ab, "\x1b[7m", 4); // enable inverted colors
+
+  char status[80], rstatus[80]; // status - left-aligned, rstatus - right-aligned
+
+  // display filename
+  int len = snprintf(status, sizeof(status), "%.20s (%d lines)",
+                     E.current_filename ? E.current_filename : "[Untitled]", E.row_count);
+
+  // display cursor position
+  int rlen = snprintf(rstatus, sizeof(rstatus), "%d/%d",
+                      E.cursor_y + 1, E.row_count);
+
+  if (len > E.screen_cols)
+    len = E.screen_cols;
+  abAppend(ab, status, len);
+
+  while (len < E.screen_cols)
+  {
+    if (E.screen_cols - len == rlen)
+    {
+      abAppend(ab, rstatus, rlen);
+      break;
+    }
+    else
+    {
+      // fill the rest of the line with spaces to make it white
+      abAppend(ab, " ", 1);
+      len++;
+    }
+  }
+
+  abAppend(ab, "\x1b[m", 3); // go back to normal formatting
+}
+
 void eRefreshScreen()
 {
   eUpdateScrollOffsets();
@@ -451,6 +486,7 @@ void eRefreshScreen()
   eResetCursor(&ab);
 
   eDrawRows(&ab);
+  eDrawStatusbar(&ab);
 
   eSetCursorPos(&ab, E.cursor_render_x - E.col_offset + 1, E.cursor_y - E.row_offset + 1);
   eSetCursorVisibility(&ab, 1);
@@ -541,15 +577,21 @@ void eInitEditor()
   E.row = NULL;
   E.row_offset = 0;
   E.col_offset = 0;
+  E.current_filename = NULL;
 
   if (tGetTerminalSize(&E.screen_rows, &E.screen_cols) == -1)
     tOnError("tGetTerminalSize");
+
+  E.screen_rows -= 1;
 }
 
 /* FILE IO */
 
 void fOpen(char *filename)
 {
+  free(E.current_filename);
+  E.current_filename = strdup(filename);
+
   FILE *fp = fopen(filename, "r");
   if (!fp)
     tOnError("fopen");
