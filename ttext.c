@@ -11,12 +11,15 @@
 #include <sys/ioctl.h>
 #include <string.h>
 #include <sys/types.h>
+#include <time.h>
+#include <stdarg.h>
 
 /* DEFINES */
 
 #define CTRL_KEY(k) ((k)&0x1f)
-#define TTEXT_VERSION "0.1"
+#define TTEXT_VERSION "0.2"
 #define TAB_SIZE 2
+#define STATUS_BAR_ENABLED 1
 
 enum editorKeymap
 {
@@ -55,6 +58,10 @@ struct editorConfig
 
   int row_offset;
   int col_offset;
+
+  char *current_filename;
+  char status_msg[80];
+  time_t status_msg_time;
 
   struct termios orig_termios;
 };
@@ -252,6 +259,15 @@ void abFree(struct abuf *ab)
 
 /* EDITOR */
 
+void eSetStatusMessage(const char *fmt, ...) // printf-style variadic function
+{
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(E.status_msg, sizeof(E.status_msg), fmt, ap);
+  va_end(ap);
+  E.status_msg_time = time(NULL);
+}
+
 void eDrawRows(struct abuf *ab)
 {
   int y;
@@ -321,10 +337,8 @@ void eDrawRows(struct abuf *ab)
     }
 
     abAppend(ab, "\x1b[K", 3); // clear to the end of the line
-    if (y < E.screen_rows - 1)
-    {
+    if (STATUS_BAR_ENABLED || y < E.screen_rows - 1)
       abAppend(ab, "\r\n", 2);
-    }
   }
 }
 
@@ -441,6 +455,50 @@ void eUpdateScrollOffsets()
   }
 }
 
+void eDrawStatusbar(struct abuf *ab)
+{
+  abAppend(ab, "\x1b[7m", 4); // enable inverted colors
+
+  char status[80], rstatus[80]; // status - left-aligned, rstatus - right-aligned
+  int len = 0, rlen = 0;
+
+  int status_msg_len = strlen(E.status_msg);
+  if (status_msg_len && time(NULL) - E.status_msg_time < 5)
+  {
+    len = snprintf(status, sizeof(status), "[*] %s", E.status_msg);
+  }
+  else
+  {
+    // display filename
+    len = snprintf(status, sizeof(status), "%.20s (%d lines)",
+                   E.current_filename ? E.current_filename : "[Untitled]", E.row_count);
+
+    // display cursor position
+    rlen = snprintf(rstatus, sizeof(rstatus), "%d/%d",
+                    E.cursor_y + 1, E.row_count);
+  }
+  if (len > E.screen_cols)
+    len = E.screen_cols;
+  abAppend(ab, status, len);
+
+  while (len < E.screen_cols)
+  {
+    if (rlen > 0 && E.screen_cols - len == rlen)
+    {
+      abAppend(ab, rstatus, rlen);
+      break;
+    }
+    else
+    {
+      // fill the rest of the line with spaces to make it white
+      abAppend(ab, " ", 1);
+      len++;
+    }
+  }
+
+  abAppend(ab, "\x1b[m", 3); // go back to normal formatting
+}
+
 void eRefreshScreen()
 {
   eUpdateScrollOffsets();
@@ -451,6 +509,8 @@ void eRefreshScreen()
   eResetCursor(&ab);
 
   eDrawRows(&ab);
+  if (STATUS_BAR_ENABLED)
+    eDrawStatusbar(&ab);
 
   eSetCursorPos(&ab, E.cursor_render_x - E.col_offset + 1, E.cursor_y - E.row_offset + 1);
   eSetCursorVisibility(&ab, 1);
@@ -541,15 +601,24 @@ void eInitEditor()
   E.row = NULL;
   E.row_offset = 0;
   E.col_offset = 0;
+  E.current_filename = NULL;
+  E.status_msg[0] = '\0';
+  E.status_msg_time = 0;
 
   if (tGetTerminalSize(&E.screen_rows, &E.screen_cols) == -1)
     tOnError("tGetTerminalSize");
+
+  if (STATUS_BAR_ENABLED)
+    E.screen_rows -= 1;
 }
 
 /* FILE IO */
 
 void fOpen(char *filename)
 {
+  free(E.current_filename);
+  E.current_filename = strdup(filename);
+
   FILE *fp = fopen(filename, "r");
   if (!fp)
     tOnError("fopen");
@@ -577,6 +646,8 @@ int main(int argc, char *argv[])
   eInitEditor();
   if (argc >= 2)
     fOpen(argv[1]);
+
+  eSetStatusMessage("Welcome to TinyText v%s!", TTEXT_VERSION);
 
   while (1)
   {
