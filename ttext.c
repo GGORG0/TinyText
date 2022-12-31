@@ -17,7 +17,7 @@
 /* DEFINES */
 
 #define CTRL_KEY(k) ((k)&0x1f)
-#define TTEXT_VERSION "0.1"
+#define TTEXT_VERSION "0.2"
 #define TAB_SIZE 2
 #define STATUS_BAR_ENABLED 1
 
